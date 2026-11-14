@@ -421,6 +421,7 @@ three.js r128 or higher (for WebXR / VR headset support)
             // Player Controls
             $(this.element).find('.playButton').click(function(e) {
                 e.preventDefault();
+                if(!self._isVideo) { return; } // no media to play for photo viewers
                 if($(this).hasClass('fa-pause')) {
                     $(this).removeClass('fa-pause').addClass('fa-play');
                     self.pause();
@@ -467,6 +468,7 @@ three.js r128 or higher (for WebXR / VR headset support)
 
             $(this.element).find(".muteButton").click(function(e) {
                 e.preventDefault();
+                if(!self._isVideo) { return; } // photo viewers have no audio
                 if($(this).hasClass('fa-volume-off')) {
                     $(this).removeClass('fa-volume-off').addClass('fa-volume-up');
                     self._video.muted = false;
@@ -637,6 +639,7 @@ three.js r128 or higher (for WebXR / VR headset support)
         },
 		
 		onProgressMouseMove: function(event){
+			if(!this._isVideo) { return; } // there is no timeline to scrub for photo viewers
 			var percent =  this.relativeX / $(this.element).find('canvas').width() * 100;
 			if(percent){
 				var tooltip = $(this.element).find('.timeTooltip');
@@ -721,7 +724,7 @@ three.js r128 or higher (for WebXR / VR headset support)
 		
 		onVolumeMouseMove: function(event){
 			event.preventDefault();
-			if(this._volumeMouseDown){
+			if(this._volumeMouseDown && this._isVideo){
 				var volumeControl = $(this.element).find('.controlsWrapper .volumeControl');
 				var percent =  (this.relativeX - volumeControl.offset().left + (volumeControl.find('.volumeBar > .volumeCursor').width()/2)) / volumeControl.width() * 100;
 				if(percent>=0 && percent<=100){
