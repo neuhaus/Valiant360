@@ -193,7 +193,11 @@ three.js r128 or higher (for WebXR / VR headset support)
 				self._mesh = new THREE.Mesh( new THREE.SphereGeometry( 500, 80, 50 ), new THREE.MeshBasicMaterial( { map: self._texture } ) );
 				self._mesh.scale.x = -1; // mirror the texture, since we're looking from the inside out
 
-				self._scene.add(self._mesh);
+				// keep the mesh in a group so it can be re-oriented for WebXR without
+				// disturbing the camera-on-the-sphere trick used by the regular view
+				self._meshGroup = new THREE.Group();
+				self._meshGroup.add(self._mesh);
+				self._scene.add(self._meshGroup);
 
 				self.startAnimation();
             };
