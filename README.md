@@ -22,6 +22,20 @@ Requirements:
 
 Disable the feature with the `enableXR` option, or drive it from code with `enterVR()` / `exitVR()` (see below).
 
+**Tuning image quality in VR.** The panorama is rendered with anti-aliasing on and (by default) no fixed foveation, i.e. full resolution even in the periphery. Two options trade GPU for sharpness:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `xrFramebufferScale` | `1` | Supersamples the XR framebuffer: `1.2` renders 1.2x per axis (~1.44x the pixels) for a sharper image. The bundled demo uses `1.2`. If a headset starts dropping frames, lower it (e.g. `1.15`) or go back to `1`. |
+| `xrFoveation` | `0` | `0` keeps full peripheral resolution; raising it towards `1` reduces peripheral detail to save GPU. |
+
+```js
+$('.valiantContainer').Valiant360({
+	xrFramebufferScale: 1.2,	// sharper on a Meta Quest 3, more GPU
+	xrFoveation: 0			// 0 = full peripheral quality
+});
+```
+
 #### Usage 
 
 See the [demo folder](https://github.com/flimshaw/Valiant360/tree/master/demo) or the [example](http://flimshaw.github.io/Valiant360).  Moving the mouse will pan the camera, and the scroll wheel will zoom in and out.
