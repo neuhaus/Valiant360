@@ -216,11 +216,13 @@ three.js r160 or higher (for WebXR / VR headset support)
 				}
 
 				// create ThreeJS mesh sphere onto which our texture will be drawn.
-				// The sphere is viewed from the inside, so it is mirrored and rendered
-				// double-sided; with only FrontSide the mirrored winding is culled on
-				// current three.js and nothing is shown.
-				self._mesh = new THREE.Mesh( new THREE.SphereGeometry( 500, 80, 50 ), new THREE.MeshBasicMaterial( { map: self._texture, side: THREE.DoubleSide } ) );
-				self._mesh.scale.x = -1; // mirror the texture, since we're looking from the inside out
+				// Invert the geometry itself (the standard three.js equirectangular
+				// setup) so the inside is visible with the default front side. An
+				// object-level scale.x = -1 is back-face culled by current three.js
+				// and shows nothing, and double-siding draws the near side as well.
+				var geometry = new THREE.SphereGeometry( 500, 80, 50 );
+				geometry.scale( -1, 1, 1 ); // mirror the texture, since we're looking from the inside out
+				self._mesh = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { map: self._texture } ) );
 
 				// keep the mesh in a group so it can be re-oriented for WebXR without
 				// disturbing the camera-on-the-sphere trick used by the regular view
