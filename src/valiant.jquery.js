@@ -60,7 +60,9 @@ three.js r128 or higher (for WebXR / VR headset support)
 			volume: 0.5,
             debug: false,
             flatProjection: false,
-            autoplay: true
+            autoplay: true,
+            enableXR: true,					// offer a VR button when a headset/WebXR is available
+            xrReferenceSpace: 'local'		// WebXR reference space used while in VR
         };
 
     // The actual plugin constructor
@@ -100,8 +102,16 @@ three.js r128 or higher (for WebXR / VR headset support)
             this._isVideo = false;
             this._isPhoto = false;
             this._isFullscreen = false;
+            this._isXRPresenting = false; // true while an immersive VR/AR session is running
+            this._xrSupported = false;
             this._mouseDown = false;
             this._dragStart = {};
+
+            // reusable objects for orienting the panorama while in VR
+            this._xrAxisX = new THREE.Vector3( 1, 0, 0 );
+            this._xrAxisY = new THREE.Vector3( 0, 1, 0 );
+            this._xrQuatX = new THREE.Quaternion();
+            this._xrQuatY = new THREE.Quaternion();
 
             this._lat = this.options.lat;
             this._lon = this.options.lon;
@@ -123,6 +133,7 @@ three.js r128 or higher (for WebXR / VR headset support)
                 return;
             }
             this.createControls();
+            this.setupXR();
 
         },
 
@@ -351,6 +362,7 @@ three.js r128 or higher (for WebXR / VR headset support)
 					</div>\
 					<span class="timeLabel"></span> \
                     <a href="#" class="fullscreenButton button fa fa-expand"></a> \
+                    <a href="#" class="vrButton button" title="View in VR">VR</a> \
                 </div> \
               </div>\
             ';
@@ -439,6 +451,15 @@ three.js r128 or higher (for WebXR / VR headset support)
                 }
             });
 
+            $(this.element).find(".vrButton").click(function(e) {
+                e.preventDefault();
+                if(self._isXRPresenting) {
+                    self.exitVR();
+                } else {
+                    self.enterVR();
+                }
+            });
+
             $(this.element).find(".muteButton").click(function(e) {
                 e.preventDefault();
                 if($(this).hasClass('fa-volume-off')) {
@@ -457,6 +478,89 @@ three.js r128 or higher (for WebXR / VR headset support)
 				.mousemove(this.onVolumeMouseMove.bind(this));
 			
 			$(this._video).on('volumechange',this.onVolumeChange.bind(this));
+        },
+
+        // detect WebXR availability and wire up the VR button / session events
+        setupXR: function() {
+            var self = this;
+
+            if(!this.options.enableXR || !this._renderer.xr) {
+                return;
+            }
+
+            this._renderer.xr.enabled = true;
+            if(this.options.xrReferenceSpace) {
+                this._renderer.xr.setReferenceSpaceType(this.options.xrReferenceSpace);
+            }
+
+            this._renderer.xr.addEventListener('sessionstart', function() {
+                self._isXRPresenting = true;
+                self._renderer.autoClear = true; // let the renderer clear each eye
+                $(self.element).addClass('xr-presenting');
+                $(self.element).find('.vrButton').addClass('active').html('Exit VR');
+            });
+
+            this._renderer.xr.addEventListener('sessionend', function() {
+                self._isXRPresenting = false;
+                self._renderer.autoClear = false;
+                // VR re-orients the mesh; undo it so the flat view looks correct again
+                if(self._meshGroup) {
+                    self._meshGroup.quaternion.identity();
+                }
+                $(self.element).removeClass('xr-presenting');
+                $(self.element).find('.vrButton').removeClass('active').html('VR');
+            });
+
+            // only reveal the button when the device actually supports an immersive session
+            if(navigator.xr) {
+                var check = navigator.xr.isSessionSupported
+                    ? navigator.xr.isSessionSupported('immersive-vr')
+                    : (navigator.xr.supportsSession ? navigator.xr.supportsSession('immersive-vr') : Promise.resolve(false));
+                check.then(function(supported) {
+                    if(supported) {
+                        self._xrSupported = true;
+                        $(self.element).find('.vrButton').show();
+                    }
+                }).catch(function() {});
+            }
+        },
+
+        enterVR: function() {
+            var self = this;
+
+            if(!navigator.xr || !this._renderer.xr || !this._renderer.xr.enabled) {
+                console.warn('Valiant360: WebXR is not available in this browser');
+                return;
+            }
+
+            navigator.xr.requestSession('immersive-vr', {
+                optionalFeatures: ['local-floor', 'bounded-floor']
+            }).then(function(session) {
+                return self._renderer.xr.setSession(session);
+            }).catch(function(err) {
+                console.error('Valiant360: unable to start VR session', err);
+            });
+        },
+
+        exitVR: function() {
+            if(this._renderer.xr && this._renderer.xr.getSession) {
+                var session = this._renderer.xr.getSession();
+                if(session) {
+                    session.end();
+                }
+            }
+        },
+
+        // Orient the panorama so the point at (lon, lat) sits in front of the viewer
+        // while the headset drives the camera. Built as Rx(phi - PI/2) * Ry(theta + PI/2)
+        // so the panorama never rolls relative to the horizon.
+        updateXRView: function() {
+            var phi = ( 90 - this._lat ) * Math.PI / 180;
+            var theta = this._lon * Math.PI / 180;
+
+            this._xrQuatX.setFromAxisAngle( this._xrAxisX, phi - Math.PI / 2 );
+            this._xrQuatY.setFromAxisAngle( this._xrAxisY, theta + Math.PI / 2 );
+            this._meshGroup.quaternion.copy( this._xrQuatX ).multiply( this._xrQuatY );
         },
 
         onMouseMove: function(event) {
@@ -671,6 +775,14 @@ three.js r128 or higher (for WebXR / VR headset support)
         },
 
         render: function() {
+            // While an immersive session is running the headset owns the camera, so
+            // instead of moving the camera we rotate the panorama to match lon/lat.
+            if( this._isXRPresenting ) {
+                this.updateXRView();
+                this._renderer.render( this._scene, this._camera );
+                return;
+            }
+
             this._lat = Math.max( - 85, Math.min( 85, this._lat ) );
             this._phi = ( 90 - this._lat ) * Math.PI / 180;
             this._theta = this._lon * Math.PI / 180;
@@ -776,10 +888,11 @@ three.js r128 or higher (for WebXR / VR headset support)
                 window.cancelAnimationFrame(this._requestAnimationId);
             }
             this._requestAnimationId = '';
+            this.exitVR();
             if(this._texture) {
                 this._texture.dispose();
             }
-            this._scene.remove(this._mesh);
+            this._scene.remove(this._meshGroup || this._mesh);
             if(this._isVideo) {
                 this.unloadVideo();
             }
