@@ -183,7 +183,11 @@ three.js r128 or higher (for WebXR / VR headset support)
                 self._texture.generateMipmaps = false;
 				self._texture.minFilter = THREE.LinearFilter;
 				self._texture.magFilter = THREE.LinearFilter;
-				self._texture.format = THREE.RGBFormat;
+				// keep photos on the leaner RGB format, but leave video textures at the
+				// default RGBA since some mobile/headset GPU drivers reject RGB uploads
+				if(self._isPhoto && typeof THREE.RGBFormat !== 'undefined') {
+					self._texture.format = THREE.RGBFormat;
+				}
 
 				// create ThreeJS mesh sphere onto which our texture will be drawn
 				self._mesh = new THREE.Mesh( new THREE.SphereGeometry( 500, 80, 50 ), new THREE.MeshBasicMaterial( { map: self._texture } ) );
@@ -710,6 +714,10 @@ three.js r128 or higher (for WebXR / VR headset support)
         },
         loadPhoto: function(photoFile) {
             this._texture = this.loadTexture( photoFile );
+            if(this._mesh) {
+                this._mesh.material.map = this._texture;
+                this._mesh.material.needsUpdate = true;
+            }
         },
 
         fullscreen: function() {
