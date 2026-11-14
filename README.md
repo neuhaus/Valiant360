@@ -18,7 +18,7 @@ Valiant360 can play panoramas and 360 videos in VR on WebXR headsets such as the
 Requirements:
 
 * A WebXR-capable browser over **HTTPS** (`localhost` is also treated as secure).
-* WebGL. The plugin now requires [three.js r128+](https://threejs.org/), which ships WebXR support. The bundled library in `demo/js/three.min.js` is already at r128.
+* WebGL. The plugin now requires [three.js r160+](https://threejs.org/), which ships WebXR support. The bundled library in `demo/js/three.min.js` is already at r160 (the last release with a browser-global build; newer releases are ES-module only).
 
 Disable the feature with the `enableXR` option, or drive it from code with `enterVR()` / `exitVR()` (see below).
 

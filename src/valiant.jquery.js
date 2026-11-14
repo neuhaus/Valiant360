@@ -12,7 +12,7 @@
 /* REQUIREMENTS:
 
 jQuery 1.7.2 or greater
-three.js r128 or higher (for WebXR / VR headset support)
+three.js r160 or higher (for WebXR / VR headset support)
 
 */
 
@@ -153,7 +153,13 @@ three.js r128 or higher (for WebXR / VR headset support)
             // modern replacement for the removed THREE.ImageUtils.loadTexture
             var loader = new THREE.TextureLoader();
             loader.setCrossOrigin(this.options.crossOrigin);
-            return loader.load(url);
+            var texture = loader.load(url);
+            // photos and video are sRGB; mark them so colour-managed three.js
+            // (r152+) converts them consistently with the renderer output
+            if(typeof THREE.SRGBColorSpace !== 'undefined') {
+                texture.colorSpace = THREE.SRGBColorSpace;
+            }
+            return texture;
         },
 
         // translate a focal length (mm, 35mm full-frame) into the camera FOV.
@@ -200,6 +206,9 @@ three.js r128 or higher (for WebXR / VR headset support)
 				// default RGBA since some mobile/headset GPU drivers reject RGB uploads
 				if(self._isPhoto && typeof THREE.RGBFormat !== 'undefined') {
 					self._texture.format = THREE.RGBFormat;
+				}
+				if(typeof THREE.SRGBColorSpace !== 'undefined') {
+					self._texture.colorSpace = THREE.SRGBColorSpace;
 				}
 
 				// create ThreeJS mesh sphere onto which our texture will be drawn
