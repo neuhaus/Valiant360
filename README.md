@@ -61,7 +61,9 @@ More detailed api documentation pending, for now the below explains about all yo
 		volume: 0.5,			// video volume by default
 		autoplay: true,			// video autoplays by default
 		enableXR: true,			// show a VR button when a WebXR headset is available
-		xrReferenceSpace: 'local'	// WebXR reference space used while in VR
+		xrReferenceSpace: 'local',	// WebXR reference space used while in VR
+		xrFramebufferScale: 1,		// XR framebuffer scale; >1 supersamples (sharper, more GPU)
+		xrFoveation: 0			// 0 = full peripheral quality, 1 = maximum foveation
 	});
 
 	// play video

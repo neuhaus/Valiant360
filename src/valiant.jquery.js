@@ -62,7 +62,9 @@ three.js r160 or higher (for WebXR / VR headset support)
             flatProjection: false,
             autoplay: true,
             enableXR: true,					// offer a VR button when a headset/WebXR is available
-            xrReferenceSpace: 'local'		// WebXR reference space used while in VR
+            xrReferenceSpace: 'local',		// WebXR reference space used while in VR
+            xrFramebufferScale: 1,			// XR framebuffer scale; >1 supersamples (sharper, more GPU)
+            xrFoveation: 0					// 0 = full peripheral quality, 1 = maximum foveation
         };
 
     // The actual plugin constructor
@@ -99,6 +101,7 @@ three.js r160 or higher (for WebXR / VR headset support)
 
             this._requestAnimationId = ''; // used to cancel requestAnimationFrame on destroy
             this._usingAnimationLoop = false; // true when three.js drives the render loop
+            this._lastVideoTime = -1; // last video time uploaded to the texture
             this._isVideo = false;
             this._isPhoto = false;
             this._isFullscreen = false;
@@ -190,7 +193,8 @@ three.js r160 or higher (for WebXR / VR headset support)
                 this.showError();
                 return false;
             }
-            this._renderer = new THREE.WebGLRenderer();
+            // antialias for smoother edges, which matters most in VR
+            this._renderer = new THREE.WebGLRenderer({ antialias: true });
             this._renderer.setSize( $(this.element).width(), $(this.element).height() );
             this._renderer.autoClear = false;
             this._renderer.setClearColor( 0x333333, 1 );
@@ -518,6 +522,14 @@ three.js r160 or higher (for WebXR / VR headset support)
             if(this.options.xrReferenceSpace) {
                 this._renderer.xr.setReferenceSpaceType(this.options.xrReferenceSpace);
             }
+            // supersample the XR framebuffer for a sharper image (>1 costs GPU)
+            if(this.options.xrFramebufferScale && this._renderer.xr.setFramebufferScaleFactor) {
+                this._renderer.xr.setFramebufferScaleFactor(this.options.xrFramebufferScale);
+            }
+            // 0 keeps full peripheral resolution; higher values trade it for GPU
+            if(typeof this.options.xrFoveation === 'number' && this._renderer.xr.setFoveation) {
+                this._renderer.xr.setFoveation(this.options.xrFoveation);
+            }
 
             this._renderer.xr.addEventListener('sessionstart', function() {
                 self._isXRPresenting = true;
@@ -802,10 +814,12 @@ three.js r160 or higher (for WebXR / VR headset support)
                         this._videocanvas.getContext('2d').drawImage(this._video, 0, 0, this._videocanvas.width, this._videocanvas.height);
                     }
                     if(typeof(this._texture) !== "undefined" ) {
-                        var ct = new Date().getTime();
-                        if(ct - this._time >= 30) {
+                        // upload whenever the video advances, so the texture keeps
+                        // up with high-refresh XR displays. The old 30ms throttle
+                        // capped it at ~33fps and dropped frames on 60fps video.
+                        if(this._video.currentTime !== this._lastVideoTime) {
                             this._texture.needsUpdate = true;
-                            this._time = ct;
+                            this._lastVideoTime = this._video.currentTime;
                         }
                     }
                 }
