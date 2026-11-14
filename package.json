@@ -1,6 +1,6 @@
 {
   "name": "jquery.valiant360",
-  "description": "jQuery plugin for playing 360 degree videos using WebGL",
+  "description": "jQuery plugin for viewing 360 degree panorama photos and videos using WebGL",
   "homepage": "http://flimshaw.github.io/Valiant360",
   "version": "0.4.3",
   "author": "Charlie Hoey <me@charliehoey.com>",
