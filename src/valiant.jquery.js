@@ -102,6 +102,7 @@ three.js r160 or higher (for WebXR / VR headset support)
             this._requestAnimationId = ''; // used to cancel requestAnimationFrame on destroy
             this._usingAnimationLoop = false; // true when three.js drives the render loop
             this._lastVideoTime = -1; // last video time uploaded to the texture
+            this._useVideoTexture = false; // true when a THREE.VideoTexture drives uploads
             this._isVideo = false;
             this._isPhoto = false;
             this._isFullscreen = false;
@@ -319,7 +320,12 @@ three.js r160 or higher (for WebXR / VR headset support)
 						createAnimation();
                     });
                 }else{
-					this._texture = new THREE.Texture( this._video );
+					// VideoTexture sets isVideoTexture, which three.js keys its video
+					// upload path on: a plain Texture takes the texStorage route and
+					// allocates empty storage from the video element's zero-size
+					// width/height attributes, so it samples black.
+					this._useVideoTexture = (typeof THREE.VideoTexture !== 'undefined');
+					this._texture = this._useVideoTexture ? new THREE.VideoTexture( this._video ) : new THREE.Texture( this._video );
 				}
 
                 //force browser caching of the video to solve rendering errors with big videos
@@ -818,10 +824,11 @@ three.js r160 or higher (for WebXR / VR headset support)
 					if(this._videocanvas) {
                         this._videocanvas.getContext('2d').drawImage(this._video, 0, 0, this._videocanvas.width, this._videocanvas.height);
                     }
-                    if(typeof(this._texture) !== "undefined" ) {
-                        // upload whenever the video advances, so the texture keeps
-                        // up with high-refresh XR displays. The old 30ms throttle
-                        // capped it at ~33fps and dropped frames on 60fps video.
+                    if(typeof(this._texture) !== "undefined" && !this._useVideoTexture) {
+                        // fallback for three.js builds without VideoTexture (and for
+                        // the canvas-based IE path): upload whenever the video
+                        // advances, instead of the old 30ms throttle that dropped
+                        // frames on 60fps video.
                         if(this._video.currentTime !== this._lastVideoTime) {
                             this._texture.needsUpdate = true;
                             this._lastVideoTime = this._video.currentTime;
