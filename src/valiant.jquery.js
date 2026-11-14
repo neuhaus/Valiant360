@@ -736,7 +736,10 @@ three.js r128 or higher (for WebXR / VR headset support)
 			event.preventDefault();
 			if(this._volumeMouseDown && this._isVideo){
 				var volumeControl = $(this.element).find('.controlsWrapper .volumeControl');
-				var percent =  (this.relativeX - volumeControl.offset().left + (volumeControl.find('.volumeBar > .volumeCursor').width()/2)) / volumeControl.width() * 100;
+				// use the event position directly; this.relativeX is relative to the
+				// canvas, while offset() is relative to the document, so mixing them
+				// made the volume track the mouse only at the page's left edge
+				var percent =  (event.pageX - volumeControl.offset().left + (volumeControl.find('.volumeBar > .volumeCursor').width()/2)) / volumeControl.width() * 100;
 				if(percent>=0 && percent<=100){
 					this._video.volume = percent/100;
 				}
