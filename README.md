@@ -1,13 +1,15 @@
 ## Valiant 360 (beta)
 
-### A browser-based video player for 360 degree panorama videos and photos.
+### A browser-based player for 360 degree panorama photos and videos.
 
 [Example](http://flimshaw.github.io/Valiant360) - [Development Log](https://github.com/flimshaw/Valiant360/wiki/Development-log)
 
 
 #### About
 
-The aim of this project is to provide a free, minimalist 360 degree video WebGL player for modern browsers. It is implemented as a jQuery plugin, with a limited interface for controlling video playback, and mouse/scrollwheel controls for zooming and panning.
+The aim of this project is to provide a free, minimalist WebGL viewer for 360 degree media in modern browsers, covering both **equirectangular photos** and **360 degree video**. It is implemented as a jQuery plugin, with a limited interface for controlling video playback (photo viewers simply ignore the playback controls), and mouse/scrollwheel controls for zooming and panning.
+
+Both kinds of source are a single 2:1 equirectangular map projected onto a sphere. Cube maps, tiled/multiresolution panoramas and partial panoramas are not supported.
 
 There is currently no mobile support, but as Chrome and Safari mobile editions enable WebGL, this should be forwards-compatible with them.
 
@@ -42,15 +44,14 @@ See the [demo folder](https://github.com/flimshaw/Valiant360/tree/master/demo) o
 
 **Markup**
 
-On the HTML side, create a div to act as your container, and add a data-video-src attribute pointing to the video file you wish to play.
+On the HTML side, create a div to act as your container, and point it at the media with `data-video-src` (360 degree video) or `data-photo-src` (equirectangular photo):
 
 ```
+	<!-- 360 degree video -->
 	<div class="valiantContainer" data-video-src="videos/my-video.mp4"></div>
-```
 
-Or, if you wish to use it to view a photo (note: currently must be powers-of-2 resolution (ie. 2048x1024):
-```
-	<div class="valiantContainer" data-photo-src="videos/my-photo.jpg"></div>
+	<!-- equirectangular photo (2:1, any resolution) -->
+	<div class="valiantContainer" data-photo-src="images/my-photo.jpg"></div>
 ```
 
 **Javascript**
