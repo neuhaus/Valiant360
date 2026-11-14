@@ -12,7 +12,7 @@
 /* REQUIREMENTS:
 
 jQuery 1.7.2 or greater
-three.js r65 or higher
+three.js r128 or higher (for WebXR / VR headset support)
 
 */
 
@@ -96,6 +96,7 @@ three.js r65 or higher
             this._id = this.generateUUID();
 
             this._requestAnimationId = ''; // used to cancel requestAnimationFrame on destroy
+            this._usingAnimationLoop = false; // true when three.js drives the render loop
             this._isVideo = false;
             this._isPhoto = false;
             this._isFullscreen = false;
@@ -118,7 +119,9 @@ three.js r65 or higher
 				$(this.element).attr("tabindex", "1");
 			}
 
-            this.createMediaPlayer();
+            if(this.createMediaPlayer() === false) {
+                return;
+            }
             this.createControls();
 
         },
@@ -133,6 +136,22 @@ three.js r65 or higher
             return uuid;
         },
 
+        loadTexture: function(url) {
+            // modern replacement for the removed THREE.ImageUtils.loadTexture
+            var loader = new THREE.TextureLoader();
+            loader.setCrossOrigin(this.options.crossOrigin);
+            return loader.load(url);
+        },
+
+        // translate a focal length (mm, 35mm full-frame) into the camera FOV.
+        // Replaces three.js' now-deprecated PerspectiveCamera.setLens so the
+        // zoom behaviour is identical on both old and new three.js builds.
+        setLens: function(focalLength, frameHeight) {
+            if ( frameHeight === undefined ) { frameHeight = 24; }
+            this._camera.fov = 2 * Math.atan( frameHeight / ( focalLength * 2 ) ) * 180 / Math.PI;
+            this._camera.updateProjectionMatrix();
+        },
+
         createMediaPlayer: function() {
 			
 			// make a self reference we can pass to our callbacks
@@ -143,10 +162,16 @@ three.js r65 or higher
 
             // create ThreeJS camera
             this._camera = new THREE.PerspectiveCamera(this._fov, $(this.element).width() / $(this.element).height(), 0.1, 1000);
-            this._camera.setLens(this._fov);
+            this.setLens(this._fov);
 
             // create ThreeJS renderer and append it to our object
-            this._renderer = Detector.webgl? new THREE.WebGLRenderer(): new THREE.CanvasRenderer();
+            // (modern three.js only ships a WebGL renderer; CanvasRenderer was removed)
+            if(!Detector.webgl) {
+                console.error('Valiant360: WebGL is not supported by this browser');
+                this.showError();
+                return false;
+            }
+            this._renderer = new THREE.WebGLRenderer();
             this._renderer.setSize( $(this.element).width(), $(this.element).height() );
             this._renderer.autoClear = false;
             this._renderer.setClearColor( 0x333333, 1 );
@@ -163,16 +188,16 @@ three.js r65 or higher
 				// create ThreeJS mesh sphere onto which our texture will be drawn
 				self._mesh = new THREE.Mesh( new THREE.SphereGeometry( 500, 80, 50 ), new THREE.MeshBasicMaterial( { map: self._texture } ) );
 				self._mesh.scale.x = -1; // mirror the texture, since we're looking from the inside out
+
 				self._scene.add(self._mesh);
 
-				self.animate();
+				self.startAnimation();
             };
 
             // figure out our texturing situation, based on what our source is
             if( $(this.element).attr('data-photo-src') ) {
                 this._isPhoto = true;
-                THREE.ImageUtils.crossOrigin = this.options.crossOrigin;
-                this._texture = THREE.ImageUtils.loadTexture( $(this.element).attr('data-photo-src') );
+                this._texture = this.loadTexture( $(this.element).attr('data-photo-src') );
 				createAnimation();
             } else {
                 this._isVideo = true;
@@ -475,7 +500,7 @@ three.js r65 or higher
                 this._fov = this.options.fovMax;
             }
 
-            this._camera.setLens(this._fov);
+            this.setLens(this._fov);
             event.preventDefault();
         },
 
@@ -600,9 +625,24 @@ three.js r65 or higher
 			}
 		},
 
+        startAnimation: function() {
+            // modern three.js drives the render loop itself, which is required for
+            // WebXR (the headset supplies the frame timing). Fall back to a plain
+            // requestAnimationFrame loop for older builds.
+            if(this._renderer.setAnimationLoop) {
+                this._usingAnimationLoop = true;
+                this._renderer.setAnimationLoop( this.animate.bind(this) );
+            } else {
+                this._usingAnimationLoop = false;
+                this._requestAnimationId = requestAnimationFrame( this.animate.bind(this) );
+            }
+        },
+
         animate: function() {
-            // set our animate function to fire next time a frame is ready
-            this._requestAnimationId = requestAnimationFrame( this.animate.bind(this) );
+            // when three.js owns the loop it schedules the next frame for us
+            if( ! this._usingAnimationLoop ) {
+                this._requestAnimationId = requestAnimationFrame( this.animate.bind(this) );
+            }
 
             if( this._isVideo ) {
                 if ( this._video.readyState === this._video.HAVE_ENOUGH_DATA) {
@@ -669,7 +709,7 @@ three.js r65 or higher
             this._video.removeAttribute('src');
         },
         loadPhoto: function(photoFile) {
-            this._texture = THREE.ImageUtils.loadTexture( photoFile );
+            this._texture = this.loadTexture( photoFile );
         },
 
         fullscreen: function() {
@@ -715,9 +755,18 @@ three.js r65 or higher
         },
 
         destroy: function() {
-            window.cancelAnimationFrame(this._requestAnimationId);
+            if(!this._renderer) {
+                return;
+            }
+            if(this._renderer.setAnimationLoop) {
+                this._renderer.setAnimationLoop( null );
+            } else {
+                window.cancelAnimationFrame(this._requestAnimationId);
+            }
             this._requestAnimationId = '';
-            this._texture.dispose();
+            if(this._texture) {
+                this._texture.dispose();
+            }
             this._scene.remove(this._mesh);
             if(this._isVideo) {
                 this.unloadVideo();
