@@ -33,7 +33,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 		<script type="text/javascript">
 			$(document).ready(function() {
-				$('.valiantPhoto').Valiant360();
+				// supersample the XR framebuffer for a sharper image on headsets
+				// (e.g. Meta Quest 3); costs some GPU
+				$('.valiantPhoto').Valiant360({ xrFramebufferScale: 1.2 });
 			});
 		</script>
 
