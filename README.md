@@ -11,6 +11,17 @@ The aim of this project is to provide a free, minimalist 360 degree video WebGL 
 
 There is currently no mobile support, but as Chrome and Safari mobile editions enable WebGL, this should be forwards-compatible with them.
 
+#### WebXR / VR headsets
+
+Valiant360 can play panoramas and 360 videos in VR on WebXR headsets such as the **Meta Quest 3** (and any other `immersive-vr` device, including desktop headsets via a WebXR-capable browser). When a headset is available a small **VR** button appears in the player controls; pressing it starts an immersive session, and the panorama is re-oriented around the viewer so head tracking pans the view. Pressing the button again (or removing the headset) returns to the regular flat view.
+
+Requirements:
+
+* A WebXR-capable browser over **HTTPS** (`localhost` is also treated as secure).
+* WebGL. The plugin now requires [three.js r128+](https://threejs.org/), which ships WebXR support. The bundled library in `demo/js/three.min.js` is already at r128.
+
+Disable the feature with the `enableXR` option, or drive it from code with `enterVR()` / `exitVR()` (see below).
+
 #### Usage 
 
 See the [demo folder](https://github.com/flimshaw/Valiant360/tree/master/demo) or the [example](http://flimshaw.github.io/Valiant360).  Moving the mouse will pan the camera, and the scroll wheel will zoom in and out.
@@ -48,7 +59,9 @@ More detailed api documentation pending, for now the below explains about all yo
 		loop: "loop", 			// video loops by default
 		muted: true,			// video muted by default
 		volume: 0.5,			// video volume by default
-		autoplay: true			// video autoplays by default
+		autoplay: true,			// video autoplays by default
+		enableXR: true,			// show a VR button when a WebXR headset is available
+		xrReferenceSpace: 'local'	// WebXR reference space used while in VR
 	});
 
 	// play video
@@ -62,6 +75,12 @@ More detailed api documentation pending, for now the below explains about all yo
 
 	// load new photo file
 	$('.valiantContainer').Valiant360('loadPhoto', 'path/to/file.jpg');
+
+	// enter VR (requires a WebXR headset and a secure context)
+	$('.valiantContainer').Valiant360('enterVR');
+
+	// leave VR
+	$('.valiantContainer').Valiant360('exitVR');
 
 	// destroy Valiant360 processing/resources (however, will not remove element from the dom. That is left up to you)
 	$('.valiantContainer').Valiant360('destroy');	
