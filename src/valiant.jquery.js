@@ -111,12 +111,6 @@ three.js r160 or higher (for WebXR / VR headset support)
             this._mouseDown = false;
             this._dragStart = {};
 
-            // reusable objects for orienting the panorama while in VR
-            this._xrAxisX = new THREE.Vector3( 1, 0, 0 );
-            this._xrAxisY = new THREE.Vector3( 0, 1, 0 );
-            this._xrQuatX = new THREE.Quaternion();
-            this._xrQuatY = new THREE.Quaternion();
-
             this._lat = this.options.lat;
             this._lon = this.options.lon;
             this._fov = this.options.fov;
@@ -552,10 +546,6 @@ three.js r160 or higher (for WebXR / VR headset support)
             this._renderer.xr.addEventListener('sessionend', function() {
                 self._isXRPresenting = false;
                 self._renderer.autoClear = false;
-                // VR re-orients the mesh; undo it so the flat view looks correct again
-                if(self._meshGroup) {
-                    self._meshGroup.quaternion.identity();
-                }
                 $(self.element).removeClass('xr-presenting');
                 $(self.element).find('.vrButton').removeClass('active').html('VR');
             });
@@ -598,18 +588,6 @@ three.js r160 or higher (for WebXR / VR headset support)
                     session.end();
                 }
             }
-        },
-
-        // Orient the panorama so the point at (lon, lat) sits in front of the viewer
-        // while the headset drives the camera. Built as Rx(phi - PI/2) * Ry(theta + PI/2)
-        // so the panorama never rolls relative to the horizon.
-        updateXRView: function() {
-            var phi = ( 90 - this._lat ) * Math.PI / 180;
-            var theta = this._lon * Math.PI / 180;
-
-            this._xrQuatX.setFromAxisAngle( this._xrAxisX, phi - Math.PI / 2 );
-            this._xrQuatY.setFromAxisAngle( this._xrAxisY, theta + Math.PI / 2 );
-            this._meshGroup.quaternion.copy( this._xrQuatX ).multiply( this._xrQuatY );
         },
 
         // touch events carry their coordinates on touches[0]; reading pageX/clientX
@@ -841,10 +819,12 @@ three.js r160 or higher (for WebXR / VR headset support)
         },
 
         render: function() {
-            // While an immersive session is running the headset owns the camera, so
-            // instead of moving the camera we rotate the panorama to match lon/lat.
+            // While an immersive session is running the headset owns the camera and
+            // the view direction: the panorama stays fixed in world space so the
+            // horizon is always level. Inheriting the flat lon/lat would tilt the
+            // whole world by the previous pitch (and made VR start facing wherever
+            // the user happened to be looking).
             if( this._isXRPresenting ) {
-                this.updateXRView();
                 this._renderer.render( this._scene, this._camera );
                 return;
             }
