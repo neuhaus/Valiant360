@@ -15,7 +15,15 @@ There is currently no mobile support, but as Chrome and Safari mobile editions e
 
 #### WebXR / VR headsets
 
-Valiant360 can play panoramas and 360 videos in VR on WebXR headsets such as the **Meta Quest 3** (and any other `immersive-vr` device, including desktop headsets via a WebXR-capable browser). When a headset is available a small **VR** button appears in the player controls; pressing it starts an immersive session, and the panorama is re-oriented around the viewer so head tracking pans the view. Pressing the button again (or removing the headset) returns to the regular flat view.
+Valiant360 can play panoramas and 360 videos in VR on WebXR headsets such as the **Meta Quest 3** (and any other `immersive-vr` device, including desktop headsets via a WebXR-capable browser). When a headset is available a small **VR** button appears in the player controls; pressing it starts an immersive session and head tracking pans the view. Pressing the button again (or removing the headset) returns to the regular flat view.
+
+Inside VR the panorama is fixed in world space (the horizon always stays level, regardless of where the flat view was looking when you entered). The controllers drive the view:
+
+| Control | Action |
+| --- | --- |
+| Look | Move your head |
+| Thumbstick left/right (either controller) | Snap-turn the view in 30° steps |
+| `B` / `Y` button | Leave VR |
 
 Requirements:
 
@@ -78,7 +86,9 @@ More detailed api documentation pending, for now the below explains about all yo
 		enableXR: true,			// show a VR button when a WebXR headset is available
 		xrReferenceSpace: 'local',	// WebXR reference space used while in VR
 		xrFramebufferScale: 1,		// XR framebuffer scale; >1 supersamples (sharper, more GPU)
-		xrFoveation: 0			// 0 = full peripheral quality, 1 = maximum foveation
+		xrFoveation: 0,			// 0 = full peripheral quality, 1 = maximum foveation
+		xrSnapTurnDegrees: 30,		// degrees the controller thumbstick snaps the view per push
+		xrExitButton: 5			// gamepad button index that ends the session (5 = B/Y)
 	});
 
 	// play video

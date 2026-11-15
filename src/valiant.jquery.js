@@ -64,7 +64,9 @@ three.js r160 or higher (for WebXR / VR headset support)
             enableXR: true,					// offer a VR button when a headset/WebXR is available
             xrReferenceSpace: 'local',		// WebXR reference space used while in VR
             xrFramebufferScale: 1,			// XR framebuffer scale; >1 supersamples (sharper, more GPU)
-            xrFoveation: 0					// 0 = full peripheral quality, 1 = maximum foveation
+            xrFoveation: 0,					// 0 = full peripheral quality, 1 = maximum foveation
+            xrSnapTurnDegrees: 30,			// degrees the controller thumbstick snaps the view per push
+            xrExitButton: 5					// gamepad button index that ends the session (5 = B/Y)
         };
 
     // The actual plugin constructor
@@ -108,6 +110,8 @@ three.js r160 or higher (for WebXR / VR headset support)
             this._isFullscreen = false;
             this._isXRPresenting = false; // true while an immersive VR/AR session is running
             this._xrSupported = false;
+            this._xrSnapTurnEngaged = false; // thumbstick is currently held past the turn threshold
+            this._xrExitEngaged = false;     // the exit button is currently held
             this._mouseDown = false;
             this._dragStart = {};
 
@@ -590,6 +594,81 @@ three.js r160 or higher (for WebXR / VR headset support)
             }
         },
 
+        // Poll the controllers once per XR frame: the thumbstick snaps the view
+        // around in fixed steps, and the B/Y button ends the session. Snap turn
+        // follows the Pannellum VR extension (engage once per push, reset when
+        // the stick returns to centre).
+        handleXRInput: function() {
+            var xr = this._renderer.xr;
+            var session = xr.getSession ? xr.getSession() : null;
+            if(!session || !session.inputSources) {
+                return;
+            }
+
+            var stickX = 0;
+            var exitPressed = false;
+            var exitButton = this.options.xrExitButton;
+
+            for(var i = 0; i < session.inputSources.length; i++) {
+                var gamepad = session.inputSources[i].gamepad;
+                if(!gamepad) {
+                    continue;
+                }
+
+                // the xr-standard mapping puts the thumbstick on axes[2]/axes[3]
+                var axes = gamepad.axes;
+                if(axes) {
+                    var x = (axes.length > 2) ? axes[2] : axes[0];
+                    if(typeof x === 'number' && Math.abs(x) > Math.abs(stickX)) {
+                        stickX = x;
+                    }
+                }
+
+                if(gamepad.buttons && gamepad.buttons[exitButton] && gamepad.buttons[exitButton].pressed) {
+                    exitPressed = true;
+                }
+            }
+
+            if(Math.abs(stickX) > 0.7) {
+                if(!this._xrSnapTurnEngaged) {
+                    this.snapTurnXR(stickX > 0 ? this.options.xrSnapTurnDegrees : -this.options.xrSnapTurnDegrees);
+                    this._xrSnapTurnEngaged = true;
+                }
+            } else {
+                this._xrSnapTurnEngaged = false;
+            }
+
+            if(exitPressed) {
+                if(!this._xrExitEngaged) {
+                    this._xrExitEngaged = true;
+                    this.exitVR();
+                }
+            } else {
+                this._xrExitEngaged = false;
+            }
+        },
+
+        // Yaw the XR reference space around the viewer, which turns the whole
+        // panorama while keeping the horizon level.
+        snapTurnXR: function(degrees) {
+            var xr = this._renderer.xr;
+            var space = xr.getReferenceSpace ? xr.getReferenceSpace() : null;
+            if(!space || !xr.setReferenceSpace || typeof XRRigidTransform === 'undefined') {
+                return;
+            }
+
+            var half = (degrees * Math.PI / 180) / 2;
+            try {
+                var transform = new XRRigidTransform(
+                    { x: 0, y: 0, z: 0 },
+                    { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) }
+                );
+                xr.setReferenceSpace(space.getOffsetReferenceSpace(transform));
+            } catch(err) {
+                console.error('Valiant360: snap turn failed', err);
+            }
+        },
+
         // touch events carry their coordinates on touches[0]; reading pageX/clientX
         // straight off the event yielded undefined and produced NaN camera angles
         getPointer: function(event) {
@@ -795,6 +874,12 @@ three.js r160 or higher (for WebXR / VR headset support)
             // when three.js owns the loop it schedules the next frame for us
             if( ! this._usingAnimationLoop ) {
                 this._requestAnimationId = requestAnimationFrame( this.animate.bind(this) );
+            }
+
+            // the headset drives this loop while presenting, so this is where we
+            // read the controllers
+            if( this._isXRPresenting ) {
+                this.handleXRInput();
             }
 
             if( this._isVideo ) {
